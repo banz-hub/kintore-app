@@ -84,7 +84,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSessions((prev) => {
       const idx = prev.findIndex((x) => x.id === s.id)
       const next = idx >= 0 ? prev.map((x) => (x.id === s.id ? s : x)) : [...prev, s]
-      next.sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+      // 記録日を後から変更しても一覧の並びが崩れないよう、日付を優先して並べる
+      next.sort((a, b) => b.date.localeCompare(a.date) || b.startedAt.localeCompare(a.startedAt))
       void repository.saveSessions(next)
       return next
     })

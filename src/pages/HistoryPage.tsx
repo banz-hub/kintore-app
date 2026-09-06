@@ -3,6 +3,7 @@ import EvaluationCard from '../components/EvaluationCard'
 import SectionTabs from '../components/SectionTabs'
 import { exerciseNameFrom } from '../data/exercises'
 import { muscleName } from '../data/muscles'
+import { shiftDateKey, shortDateLabel } from '../lib/calc'
 import { evaluateSession } from '../lib/evaluation'
 import { exportBackup, importBackup } from '../lib/storage'
 import { useApp } from '../state/AppContext'
@@ -247,6 +248,16 @@ export default function HistoryPage() {
 
                     <div className="grid-2">
                       <label>
+                        記録日
+                        <input
+                          type="date"
+                          value={draft.date}
+                          onChange={(e) =>
+                            e.target.value && setDraft({ ...draft, date: e.target.value })
+                          }
+                        />
+                      </label>
+                      <label>
                         有酸素 (分)
                         <input
                           type="number"
@@ -275,6 +286,21 @@ export default function HistoryPage() {
                         />
                       </label>
                     </div>
+                    <div className="form-actions date-quick">
+                      <button
+                        type="button"
+                        onClick={() => setDraft({ ...draft, date: shiftDateKey(draft.date, -1) })}
+                      >
+                        ← 前日 {shortDateLabel(shiftDateKey(draft.date, -1))}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDraft({ ...draft, date: shiftDateKey(draft.date, 1) })}
+                      >
+                        翌日 {shortDateLabel(shiftDateKey(draft.date, 1))} →
+                      </button>
+                    </div>
+
                     <label>
                       メモ
                       <textarea

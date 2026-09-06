@@ -185,6 +185,57 @@ export function toDateKey(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+/**
+ * 1日の区切り時刻の既定値。
+ * 深夜3時までのトレーニングは前日の分として扱う。
+ * 0時で切り替えると、夜遅くに始めて日付をまたいだ記録が翌日に飛んでしまうため。
+ */
+export const DEFAULT_DAY_CUTOFF_HOUR = 3
+
+/** プロフィールの設定値。未設定なら既定値 */
+export function cutoffOf(profile: { dayCutoffHour?: number } | null | undefined): number {
+  return profile?.dayCutoffHour ?? DEFAULT_DAY_CUTOFF_HOUR
+}
+
+/**
+ * 1日の区切り時刻を考慮した「アプリ上の現在時刻」。
+ * 区切り時刻より前は前日とみなしたいので、その分だけ時計を巻き戻した Date を返す。
+ * 日付の判定はすべてこの値を通すことで、深夜のトレーニングが翌日扱いにならないようにする。
+ */
+export function appNow(cutoffHour = DEFAULT_DAY_CUTOFF_HOUR, now = new Date()): Date {
+  if (!cutoffHour) return now
+  return new Date(now.getTime() - cutoffHour * 60 * 60 * 1000)
+}
+
+/** 区切り時刻を考慮した「今日」の日付キー */
+export function appToday(cutoffHour = DEFAULT_DAY_CUTOFF_HOUR, now = new Date()): string {
+  return toDateKey(appNow(cutoffHour, now))
+}
+
+/**
+ * 'YYYY-MM-DD' をローカル時刻の Date にする。
+ * new Date('2026-09-04') は UTC 深夜として解釈されるため、
+ * タイムゾーンによっては前日になってしまう。それを避けて明示的に組み立てる。
+ */
+export function parseDateKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, (m ?? 1) - 1, d ?? 1)
+}
+
+/** 日付キーを days 日ずらす */
+export function shiftDateKey(key: string, days: number): string {
+  const d = parseDateKey(key)
+  d.setDate(d.getDate() + days)
+  return toDateKey(d)
+}
+
+/** 'M/D(曜)' の短い表記 */
+export function shortDateLabel(key: string): string {
+  const d = parseDateKey(key)
+  const w = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()]
+  return `${d.getMonth() + 1}/${d.getDate()}(${w})`
+}
+
 export function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v))
 }

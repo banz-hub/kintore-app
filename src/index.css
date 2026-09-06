@@ -1656,3 +1656,14 @@ fieldset.picker legend {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+/* 記録日の切り替えボタン */
+.date-quick {
+  margin-top: -4px;
+  margin-bottom: 10px;
+}
+
+.date-quick button {
+  font-size: 0.8rem;
+  padding: 8px 12px;
+}

@@ -29,6 +29,7 @@ const DEFAULTS: Omit<Profile, 'updatedAt'> = {
   experience: 'beginner',
   dailyMinutes: 45,
   daysPerWeek: 3,
+  dayCutoffHour: 3,
   equipment: [],
 }
 
@@ -224,6 +225,21 @@ export default function ProfilePage() {
               </select>
             </label>
             <label>
+              1日の区切り時刻
+              <select
+                value={form.dayCutoffHour ?? 3}
+                onChange={(e) => patch({ dayCutoffHour: Number(e.target.value) })}
+              >
+                <option value={0}>0時（日付が変わったら翌日扱い）</option>
+                <option value={1}>深夜1時まで前日</option>
+                <option value={2}>深夜2時まで前日</option>
+                <option value={3}>深夜3時まで前日</option>
+                <option value={4}>深夜4時まで前日</option>
+                <option value={5}>深夜5時まで前日</option>
+                <option value={6}>朝6時まで前日</option>
+              </select>
+            </label>
+            <label>
               普段の活動量
               <select
                 value={form.activityLevel}
@@ -237,6 +253,10 @@ export default function ProfilePage() {
               </select>
             </label>
           </div>
+          <p className="muted">
+            深夜にトレーニングする場合、「1日の区切り時刻」より前は前日の記録として扱います。
+            日付をまたいだ記録は、記録画面でその都度どちらの日にするか選ぶこともできます。
+          </p>
         </section>
 
         <section className="card">

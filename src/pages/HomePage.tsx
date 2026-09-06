@@ -13,7 +13,7 @@ import {
   todaysMissions,
   type BadgeProgress,
 } from '../lib/achievements'
-import { bmi, bmiCategory, buildGoalPlan, toDateKey } from '../lib/calc'
+import { appNow, bmi, bmiCategory, buildGoalPlan, cutoffOf, parseDateKey, toDateKey } from '../lib/calc'
 import { GOAL_LABEL } from '../lib/planner'
 import { isMissedToday, loadReminder } from '../lib/reminders'
 import { weightSeries } from '../lib/stats'
@@ -24,13 +24,15 @@ export default function HomePage() {
   const [weightInput, setWeightInput] = useState('')
   const [missedDismissed, setMissedDismissed] = useState(false)
 
-  const stats = useMemo(() => computeStats(sessions, profile), [sessions, profile])
+  // 1日の区切り時刻を反映した「今」。深夜のトレーニングが翌日扱いにならないようにする
+  const now = useMemo(() => appNow(cutoffOf(profile)), [profile])
+  const stats = useMemo(() => computeStats(sessions, profile, now), [sessions, profile, now])
   const badges = useMemo(() => evaluateBadges(stats), [stats])
   const missions = useMemo(
-    () => todaysMissions(sessions, goal, stats, weights),
-    [sessions, goal, stats, weights],
+    () => todaysMissions(sessions, goal, stats, weights, now),
+    [sessions, goal, stats, weights, now],
   )
-  const days = useMemo(() => recentDays(stats.activeDays, 14), [stats])
+  const days = useMemo(() => recentDays(stats.activeDays, 14, now), [stats, now])
 
   const [newBadges, setNewBadges] = useState<BadgeProgress[]>([])
 
@@ -63,7 +65,7 @@ export default function HomePage() {
     )
   }
 
-  const today = toDateKey(new Date())
+  const today = toDateKey(now)
   const todaySession = sessions.find((s) => s.date === today)
   const recent = sessions.slice(0, 3)
   const goalPlan = goal
@@ -87,7 +89,7 @@ export default function HomePage() {
   const todayWeight = series.find((w) => w.date === today)?.weightKg ?? null
   const latestWeight = series[series.length - 1]?.weightKg ?? null
   // 1週間前に最も近い記録と比べる
-  const weekAgoDate = new Date(today)
+  const weekAgoDate = parseDateKey(today)
   weekAgoDate.setDate(weekAgoDate.getDate() - 7)
   const weekAgo = toDateKey(weekAgoDate)
   const past = [...series].reverse().find((w) => w.date <= weekAgo)

@@ -3,14 +3,16 @@ import { Link } from 'react-router-dom'
 import BadgeCard from '../components/BadgeCard'
 import SectionTabs from '../components/SectionTabs'
 import { WEEKDAY_LABELS, computeStats, evaluateBadges, recentWeeks } from '../lib/achievements'
+import { appNow, cutoffOf } from '../lib/calc'
 import { useApp } from '../state/AppContext'
 
 export default function AchievementsPage() {
   const { profile, sessions } = useApp()
 
-  const stats = useMemo(() => computeStats(sessions, profile), [sessions, profile])
+  const now = useMemo(() => appNow(cutoffOf(profile)), [profile])
+  const stats = useMemo(() => computeStats(sessions, profile, now), [sessions, profile, now])
   const badges = useMemo(() => evaluateBadges(stats), [stats])
-  const weeks = useMemo(() => recentWeeks(stats.activeDays, 4), [stats])
+  const weeks = useMemo(() => recentWeeks(stats.activeDays, 4, now), [stats, now])
 
   const unlocked = badges.filter((b) => b.unlocked)
   const locked = badges.filter((b) => !b.unlocked)

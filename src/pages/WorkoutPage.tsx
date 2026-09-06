@@ -4,7 +4,7 @@ import EvaluationCard from '../components/EvaluationCard'
 import RestTimer from '../components/RestTimer'
 
 import { muscleName } from '../data/muscles'
-import { toDateKey } from '../lib/calc'
+import { appNow, cutoffOf, shiftDateKey, shortDateLabel, toDateKey } from '../lib/calc'
 import { evaluateSession } from '../lib/evaluation'
 import { GOAL_LABEL, generateWorkoutPlan } from '../lib/planner'
 import {
@@ -38,14 +38,14 @@ interface Row {
 }
 
 /** 日付ごとに安定したシード。同じ日なら再訪してもメニューが変わらない */
-function seedForToday(extra: number): number {
-  const key = toDateKey(new Date())
+function seedForToday(dateKey: string, extra: number): number {
+  const key = dateKey
   let h = 0
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0
   return (h + extra * 7919) | 0
 }
 
-function buildSession(plan: WorkoutPlan): WorkoutSession {
+function buildSession(plan: WorkoutPlan, dateKey: string): WorkoutSession {
   const exercises: LoggedExercise[] = plan.exercises.map((p) => ({
     exerciseId: p.exerciseId,
     sets: Array.from({ length: p.sets }, (): LoggedSet => ({
@@ -56,7 +56,7 @@ function buildSession(plan: WorkoutPlan): WorkoutSession {
   }))
   return {
     id: `ws_${Date.now()}`,
-    date: toDateKey(new Date()),
+    date: dateKey,
     startedAt: new Date().toISOString(),
     planId: plan.id,
     targetMuscles: plan.targetMuscles,
@@ -77,12 +77,13 @@ export default function WorkoutPage() {
   /** 記録中に追加する種目の選択 */
   const [addingId, setAddingId] = useState('')
 
-  const todayKey = toDateKey(new Date())
+  // 1日の区切り時刻を反映した「今日」。深夜0時を回っても設定次第で前日のままになる
+  const todayKey = toDateKey(appNow(cutoffOf(profile)))
 
   const plan = useMemo(() => {
     if (!profile || !goal || goal.targetMuscles.length === 0) return null
     const base = generateWorkoutPlan(profile, goal.type, goal.targetMuscles, {
-      seed: seedForToday(reroll),
+      seed: seedForToday(todayKey, reroll),
       excludeIds: excluded,
       exercises,
     })
@@ -92,10 +93,12 @@ export default function WorkoutPage() {
 
   // 当日のセッションがあれば読み込む。未完了なら再開、完了済みなら結果と評価を表示する
   useEffect(() => {
-    const today = toDateKey(new Date())
+    const today = toDateKey(appNow(cutoffOf(profile)))
     const todays = sessions.filter((s) => s.date === today)
     const current =
       todays.find((s) => !s.finishedAt) ??
+      // 前夜に始めてそのまま日付をまたいだ記録も拾う。放置されたままにしないため
+      sessions.find((s) => !s.finishedAt && s.date >= shiftDateKey(today, -1)) ??
       todays.sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]
     if (current) {
       sessionRef.current = current
@@ -145,7 +148,7 @@ export default function WorkoutPage() {
 
   function start() {
     if (!plan) return
-    updateSession(buildSession(plan))
+    updateSession(buildSession(plan, todayKey))
   }
 
   function patchSet(exIdx: number, setIdx: number, patch: Partial<LoggedSet>) {
@@ -202,6 +205,11 @@ export default function WorkoutPage() {
     setAddingId('')
   }
 
+  /** この記録を何日の分として残すかを変える */
+  function setSessionDate(dateKey: string) {
+    mutateSession((prev) => ({ ...prev, date: dateKey }))
+  }
+
   /** 記録中のメニューから種目を外す */
   function removeExercise(exerciseId: string) {
     mutateSession((prev) => ({
@@ -250,6 +258,12 @@ export default function WorkoutPage() {
         ...decorate(p.exerciseId),
       }))
 
+  // 記録を始めた日と、その翌日。日付をまたいだときの選択肢になる
+  const startedDateKey = session ? toDateKey(new Date(session.startedAt)) : todayKey
+  const nextDateKey = shiftDateKey(startedDateKey, 1)
+  // 実際のカレンダー上で日付が変わったか (区切り時刻の設定とは別に判定する)
+  const crossedMidnight = Boolean(session) && toDateKey(new Date()) !== startedDateKey
+
   return (
     <div className={`page${rest ? ' has-rest-timer' : ''}`}>
       <h1>今日のメニュー</h1>
@@ -257,6 +271,32 @@ export default function WorkoutPage() {
         {GOAL_LABEL[goal.type]} ／ 対象: {goal.targetMuscles.map(muscleName).join('・')} ／ 使える時間{' '}
         {profile.dailyMinutes}分
       </p>
+
+      {session && crossedMidnight && (
+        <section className="card celebrate">
+          <h2>🌙 日付が変わりました</h2>
+          <p>この記録をどちらの日の分として残しますか？ あとから変えられます。</p>
+          <div className="segmented" role="group" aria-label="記録日の選択">
+            <button
+              type="button"
+              className={session.date === startedDateKey ? 'is-on' : ''}
+              onClick={() => setSessionDate(startedDateKey)}
+            >
+              前日分 {shortDateLabel(startedDateKey)}
+            </button>
+            <button
+              type="button"
+              className={session.date === nextDateKey ? 'is-on' : ''}
+              onClick={() => setSessionDate(nextDateKey)}
+            >
+              翌日分 {shortDateLabel(nextDateKey)}
+            </button>
+          </div>
+          <p className="muted">
+            設定の「1日の区切り時刻」を決めておくと、毎回選ばなくても自動で振り分けられます。
+          </p>
+        </section>
+      )}
 
       {rows.length === 0 ? (
         <div className="card">
@@ -523,6 +563,32 @@ export default function WorkoutPage() {
               <span className="stat-sub">kg</span>
             </div>
           </div>
+          <label>
+            この記録の日付
+            <input
+              type="date"
+              value={session.date}
+              onChange={(e) => e.target.value && setSessionDate(e.target.value)}
+            />
+          </label>
+          <div className="form-actions date-quick">
+            <button
+              type="button"
+              className={session.date === startedDateKey ? 'primary' : ''}
+              onClick={() => setSessionDate(startedDateKey)}
+            >
+              {shortDateLabel(startedDateKey)}
+            </button>
+            <button
+              type="button"
+              className={session.date === nextDateKey ? 'primary' : ''}
+              onClick={() => setSessionDate(nextDateKey)}
+            >
+              {shortDateLabel(nextDateKey)}
+            </button>
+            <span className="muted">開始 {new Date(session.startedAt).toLocaleString()}</span>
+          </div>
+
           <label>
             今日の体重 (kg・任意)
             <input

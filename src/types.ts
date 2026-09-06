@@ -58,6 +58,11 @@ export interface Profile {
   /** 週あたりのトレーニング日数 */
   daysPerWeek: number
   equipment: OwnedEquipment[]
+  /**
+   * 1日の区切り時刻 (0〜6)。深夜に運動する人向け。
+   * 例: 4 なら深夜4時までは前日の記録として扱う。既定は 0 (0時で切り替わる)
+   */
+  dayCutoffHour?: number
   /** メニューに出したくない種目のID */
   hiddenExerciseIds?: string[]
   updatedAt: string
